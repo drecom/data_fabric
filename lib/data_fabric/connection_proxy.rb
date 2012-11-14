@@ -65,16 +65,17 @@ module DataFabric
     cattr_accessor :shard_pools
 
     def initialize(model_class, options)
-      @model_class = model_class      
-      @replicated  = options[:replicated]
-      @shard_group = options[:shard_by]
-      @prefix      = options[:prefix]
-      set_role('slave') if @replicated
+      @model_class  = model_class
+      @replicated   = options[:replicated]
+      @shard_group  = options[:shard_by]
+      @prefix       = options[:prefix]
+      @default_role = options[:default_role] || 'slave'
+      set_role(@default_role) if @replicated
 
       @model_class.send :include, ActiveRecordConnectionMethods if @replicated
     end
 
-    delegate :insert, :update, :delete, :create_table, :rename_table, :drop_table, :add_column, :remove_column, 
+    delegate :insert, :update, :delete, :create_table, :rename_table, :drop_table, :add_column, :remove_column,
       :change_column, :change_column_default, :rename_column, :add_index, :remove_index, :initialize_schema_information,
       :dump_schema_information, :execute, :execute_ignore_duplicate, :to => :master
 
@@ -99,13 +100,23 @@ module DataFabric
       connection_name_builder.join('_')
     end
 
-    def with_master
-      # Allow nesting of with_master.
+    def current_role
+      Thread.current[:data_fabric_role] || @default_role
+    end
+
+    def with_role(role)
+      # Allow nesting of with_role.
       old_role = current_role
-      set_role('master')
+      set_role(role)
       yield
     ensure
       set_role(old_role)
+    end
+
+    [:master, :slave, :standby].each do |sym|
+      define_method("with_#{sym}") do |&block|
+        with_role(sym.to_s, &block)
+      end
     end
 
     def connected?
@@ -162,10 +173,6 @@ module DataFabric
 
     def set_role(role)
       Thread.current[:data_fabric_role] = role
-    end
-
-    def current_role
-      Thread.current[:data_fabric_role] || 'slave'
     end
 
     def master
