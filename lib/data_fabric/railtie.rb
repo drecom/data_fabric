@@ -7,5 +7,9 @@ module DataFabric
       require 'data_fabric/query_cache'
       app.middleware.swap ActiveRecord::QueryCache, DataFabric::QueryCache
     end
+
+    rake_tasks do
+      load "data_fabric/railties/databases.rake"
+    end
   end
 end
