@@ -41,7 +41,7 @@ module DataFabric
       @proxy.connected?
     end
 
-    %w(disconnect! release_connection clear_reloadable_connections! clear_stale_cached_connections! verify_active_connections!).each do |name|
+    %w(disconnect! release_connection clear_reloadable_connections! clear_stale_cached_connections! verify_active_connections! reap).each do |name|
       define_method(name.to_sym) do
         @proxy.shard_pools.values.each do |pool|
           pool.send(name.to_sym)
@@ -49,7 +49,7 @@ module DataFabric
       end
     end
 
-    %w(columns column_defaults columns_hash table_exists? primary_keys).each do |name|
+    %w(table_exists?).each do |name|
       define_method(name.to_sym) do |*args|
         @proxy.current_pool.send(name.to_sym, *args)
       end
@@ -170,7 +170,7 @@ module DataFabric
       config = config.symbolize_keys
       adapter_method = "#{config[:adapter]}_connection"
       initialize_adapter(config[:adapter])
-      ActiveRecord::Base::ConnectionSpecification.new(config, adapter_method)
+      ActiveRecord::ConnectionAdapters::ConnectionSpecification.new(config, adapter_method)
     end
 
     def initialize_adapter(adapter)

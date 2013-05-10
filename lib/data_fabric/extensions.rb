@@ -32,6 +32,10 @@ module DataFabric
             # <= Rails 3.1
             @connection_pools[klass_name] = pool_proxy
           end
+
+          if respond_to?(:owner_to_pool, true)
+            owner_to_pool[klass_name] = pool_proxy
+          end
         end
       end
     end
