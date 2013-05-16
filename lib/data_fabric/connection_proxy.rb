@@ -75,15 +75,38 @@ module DataFabric
       @model_class.send :include, ActiveRecordConnectionMethods if @replicated
     end
 
-    delegate :insert, :update, :delete, :create_table, :rename_table, :drop_table, :add_column, :remove_column,
+    MASTER_METHODS = [:insert, :update, :delete, :create_table, :rename_table, :drop_table, :add_column, :remove_column,
       :change_column, :change_column_default, :rename_column, :add_index, :remove_index, :initialize_schema_information,
-      :dump_schema_information, :execute, :execute_ignore_duplicate, :to => :master
+      :dump_schema_information, :execute, :execute_ignore_duplicate, :insert_many]
 
-    delegate :insert_many, :to => :master # ar-extensions bulk insert support
+    CLEAR_CACHE_METHODS = [:update, :insert, :delete, :exec_insert, :exec_update, :exec_delete, :insert_many]
 
     def transaction(start_db_transaction = true, &block)
       with_master do
         connection.transaction(start_db_transaction, &block)
+      end
+    end
+
+    def cache
+      enable_query_cache!
+      yield
+    ensure
+      clear_query_cache
+    end
+
+    def enable_query_cache!
+      shard_pools.each do |k,v|
+        v.connection.enable_query_cache!
+      end
+    end
+
+    def clear_query_cache_if_needed(method)
+      clear_query_cache if CLEAR_CACHE_METHODS.include?(method)
+    end
+
+    def clear_query_cache
+      shard_pools.each do |k,v|
+        v.connection.clear_query_cache
       end
     end
 
@@ -93,7 +116,12 @@ module DataFabric
 
     def method_missing(method, *args, &block)
       DataFabric.logger.debug { "Calling #{method} on #{connection}" }
-      connection.send(method, *args, &block)
+      clear_query_cache_if_needed(method)
+      if MASTER_METHODS.include?(method)
+        master.send(method, *args, &block)
+      else
+        connection.send(method, *args, &block)
+      end
     end
 
     def connection_name
