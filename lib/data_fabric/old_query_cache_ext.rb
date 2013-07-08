@@ -1,4 +1,4 @@
-require 'active_record/connection_adapters/query_cache'
+require 'active_record/connection_adapters/abstract/query_cache'
 
 module ActiveRecord
   module ConnectionAdapters
