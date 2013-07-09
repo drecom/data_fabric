@@ -25,7 +25,9 @@ module DataFabric
         @target.close if @target.respond_to?(:close)
       ensure
         klasses = [ActiveRecord::Base, *DataFabric::ConnectionProxy.shard_pools.values]
-        ActiveRecord::Base.connection_id = @connection_id
+        if ActiveRecord::VERSION::STRING >= '3.1'
+          ActiveRecord::Base.connection_id = @connection_id
+        end
         klasses.each do |k|
           k.connection.clear_query_cache
           unless @original_cache_value
@@ -47,7 +49,10 @@ module DataFabric
       end
 
       status, headers, body = @app.call(env)
-      [status, headers, BodyProxy.new(old, body, ActiveRecord::Base.connection_id)]
+      connection_id = if ActiveRecord::Base.respond_to?(:connection_id)
+                        ActiveRecord::Base.connection_id
+                      end
+      [status, headers, BodyProxy.new(old, body, connection_id)]
     rescue Exception => e
       klasses.each do |k|
         k.connection.clear_query_cache
