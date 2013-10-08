@@ -7,7 +7,7 @@ module DataFabric
     end
 
     def reload_with_master(*args, &block)
-      connection.with_master { reload_without_master(*args, &block) }
+      self.class.connection.with_master { reload_without_master(*args, &block) }
     end
   end
 
