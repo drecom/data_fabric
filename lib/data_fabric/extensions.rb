@@ -15,7 +15,38 @@ module DataFabric
 
       # Wire up ActiveRecord::Base
       model.extend ClassMethods
+      ActiveRecord::ConnectionAdapters::ConnectionHandler.instance_exec do
+        include ConnectionHandlerExtension
+      end
       ConnectionProxy.shard_pools = {}
+    end
+
+    module ConnectionHandlerExtension
+      extend ActiveSupport::Concern
+
+      included do
+        alias_method_chain :pool_for, :data_fabric
+      end
+
+      private
+
+      def pool_for_with_data_fabric(owner)
+        owner_to_pool.fetch(owner.name) {
+          if ancestor_pool = pool_from_any_process_for(owner)
+            if ancestor_pool.is_a?(DataFabric::PoolProxy)
+              # Use same PoolProxy object
+              owner_to_pool[owner.name] = ancestor_pool
+            else
+              # A connection was established in an ancestor process that must have
+              # subsequently forked. We can't reuse the connection, but we can copy
+              # the specification and establish a new connection with it.
+              establish_connection owner, ancestor_pool.spec
+            end
+          else
+            owner_to_pool[owner.name] = nil
+          end
+        }
+      end
     end
 
     # Class methods injected into ActiveRecord::Base
@@ -28,24 +59,10 @@ module DataFabric
 
         # Clear current connections
         klass.remove_connection
-        klass.subclasses.each do |k|
-          k.remove_connection unless k.abstract_class
-        end
-        @class_to_pool.clear if @class_to_pool
+        ch = connection_handler
 
-        connection_handler.instance_eval do
-          if @class_to_pool
-            # Rails 3.2
-            @class_to_pool[klass_name] = pool_proxy
-          else
-            # <= Rails 3.1
-            @connection_pools[klass_name] = pool_proxy
-          end
-
-          if respond_to?(:owner_to_pool, true)
-            owner_to_pool[klass_name] = pool_proxy
-          end
-        end
+        ch.class_to_pool.clear if defined?(ch.class_to_pool)
+        ch.send(:class_to_pool)[klass_name] = ch.send(:owner_to_pool)[klass_name] = pool_proxy
       end
     end
   end
