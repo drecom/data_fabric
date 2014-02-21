@@ -56,6 +56,7 @@ module DataFabric
         pool_proxy = PoolProxy.new(ConnectionProxy.new(self, options))
         klass      = self
         klass_name = name
+        DataFabric.shard_class_list << klass
 
         # Clear current connections
         klass.remove_connection
@@ -63,6 +64,26 @@ module DataFabric
 
         ch.class_to_pool.clear if defined?(ch.class_to_pool)
         ch.send(:class_to_pool)[klass_name] = ch.send(:owner_to_pool)[klass_name] = pool_proxy
+      end
+
+      def multi_shard_transaction(*args, &block)
+        raise unless block_given?
+        klass = args.shift
+
+        options = args.last.is_a?(Hash) ? args.pop : {}
+
+        klass.transaction(options) do
+          if args.empty?
+            block.call
+          else
+            multi_shard_transaction(*args, options, &block)
+          end
+        end
+      end
+
+      def all_shard_transaction(options = {}, &block)
+        class_list = DataFabric.shard_class_list.uniq
+        multi_shard_transaction(*class_list, options, &block)
       end
     end
   end

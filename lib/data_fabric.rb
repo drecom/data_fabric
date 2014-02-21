@@ -93,6 +93,10 @@ module DataFabric
     Thread.current[:shards] = {} unless Thread.current[:shards]
   end
 
+  def self.shard_class_list
+    @shard_class_list ||= []
+  end
+
   private
   def self.default_logger
     devnull = RUBY_PLATFORM =~ /w32/ ? 'nul' : '/dev/null'
