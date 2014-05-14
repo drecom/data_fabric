@@ -5,7 +5,7 @@ module DataFabric
   class Railtie < Rails::Railtie # :nodoc:
     initializer "data_fabric.swap_query_cache_middleware" do |app|
       require 'data_fabric/query_cache'
-      app.middleware.swap ActiveRecord::QueryCache, DataFabric::QueryCache
+      app.middleware.insert_before ActiveRecord::QueryCache, DataFabric::QueryCache
     end
 
     rake_tasks do
