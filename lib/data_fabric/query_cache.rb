@@ -26,7 +26,7 @@ module DataFabric
     def restore_query_cache_settings(connection_id, enabled)
       klasses = DataFabric::ConnectionProxy.shard_pools.values
       klasses.each do |k|
-        k.connection_id = connection_id
+        ActiveRecord::Base.connection_id = connection_id
         k.connection.clear_query_cache
         k.connection.disable_query_cache! unless enabled
       end
