@@ -59,9 +59,7 @@ module DataFabric
         DataFabric.shard_class_list << klass
 
         # Clear current connections
-        klass.remove_connection
         ch = connection_handler
-
         ch.class_to_pool.clear if defined?(ch.class_to_pool)
         ch.send(:class_to_pool)[klass_name] = ch.send(:owner_to_pool)[klass_name] = pool_proxy
       end
